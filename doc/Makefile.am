@@ -1,0 +1,30 @@
+# Copyright (C) 2008 Dominik Dahlem <Dominik.Dahlem@gmail.com>
+#  
+# This file is free software; as a special exception the author gives
+# unlimited permission to copy and/or distribute it, with or without 
+# modifications, as long as this notice is preserved.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+report_src = report.tex
+
+EXTRA_DIST = $(report_src) report.pdf ./images
+
+all-local: report.pdf
+
+clean-local:
+	rm -f *.aux *.log *.pdf *.dvi *.ps
+
+dvi-local: report.dvi
+
+report.dvi: $(report_src)
+	$(latex) $<
+	$(latex) $<
+
+%.ps: %.dvi
+	( unset LANG; $(dvips) $< -o $@ || { rm -f $@ ; false; }; )
+
+%.pdf: %.ps
+	( unset LANG; $(ps2pdf) $< $@ || { rm -f $@ ; false; } )

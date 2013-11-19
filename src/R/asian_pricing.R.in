@@ -1,0 +1,122 @@
+## Copyright (C) 2008 Dominik Dahlem <Dominik.Dahlem@gmail.com>
+##  
+## This file is free software; as a special exception the author gives
+## unlimited permission to copy and/or distribute it, with or without 
+## modifications, as long as this notice is preserved.
+## 
+## This program is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+## implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+## Author: Dominik Dahlem <Dominik.Dahlem@gmail.com>
+## Maintainer: Dominik Dahlem <Dominik.Dahlem@gmail.com>
+## Keywords: asian option pricing
+## Created: 30.04.2008
+
+
+# load the library that implements the asian option pricing routines
+library(asianOptionPricing)
+
+# if it was configured using MPI, load the snow library
+if (@HAVE_MPI@) {
+  library(snow)
+}
+
+
+S0 <- 12
+K <- 14
+S.min <- 0
+S.max <- 2 * K
+S.step <- 0.1
+r <- 0.0002
+sigma <- 0.013
+sigma.min <- 0
+sigma.step <- 0.05
+T <- 100
+l <- 22
+reps <- 2000
+seed <- 123574903
+pseudoRnd <- TRUE
+euro <- TRUE
+cl <- NULL
+
+# save the configuration parameters
+csv.write.config(data.frame(S0, K, S.min, S.max, S.step, r, sigma, T, l, reps, seed,
+                            pseudoRnd, euro))
+
+message("Start with the simulation!")
+
+
+if (@HAVE_MPI@) {
+  # read the NODEFILE to find out how many nodes are participating in the cluster
+  nodes <- read.table("NODEFILE")
+  
+  # make the cluster
+  cl <- makeCluster(length(nodes$V1), type="MPI")
+
+  # load the asianOptionPricing library on each node
+  clusterEvalQ(cl, library(asianOptionPricing)) 
+}
+
+# (1) evolve the share price
+message("Evolve the share price...")
+sp <- share.price.evolve.mc(S0=S0, r=r, sigma=sigma, T=T, reps=reps, pseudo=pseudoRnd)
+csv.write.data(sp, "shareEvolve.dat")
+plot.share.evo(sp)
+
+# (2) simulate average share prices
+message("Simulate the average share price...")
+sa <- share.average.mc(S0=S0, r=r, sigma=sigma, T=T, l=l, reps=reps, pseudo=pseudoRnd)
+csv.write.data(sa, "hist_shareAverage.dat")
+plot.share.average(sa)
+
+# (3) calculate the greeks
+message("Calculate the greeks...")
+g <- greeks(S.min=S.min, S.max=S.max, h=S.step,
+            K=K, r=r, sigma=sigma, T=T, l=l, reps=reps, european=euro, pseudo=pseudoRnd,
+            cluster=cl)
+plot.option.share(g)
+
+
+# (4) calculate the volatility bracket
+message("Calculate the volatility brackets...")
+
+if (pseudoRnd) {
+  # volatility bracket 0 < sigma_annual < 1
+  option.payoff <- price.option.sigma(S0=S0, sigma.min=sigma.min, sigma.max=1,
+                                      sigma.step=sigma.step, K=K, r=r, T=T, l=l, reps=reps,
+                                      seed=seed, pseudo=pseudoRnd, cluster=cl)
+
+  # plot the results
+  csv.write.data(option.payoff, "priceOptionSigma100.dat")
+  plot.option.sigma(data=option.payoff, file="priceOptionSigma100.eps")
+
+  # volatility bracket 0 < sigma_annual < 6
+  option.payoff <- price.option.sigma(S0=S0, sigma.min=sigma.min, sigma.max=6,
+                                      sigma.step=sigma.step, K=K, r=r, T=T, l=l, reps=reps,
+                                      seed=seed, pseudo=pseudoRnd, cluster=cl)
+
+  # plot the results
+  csv.write.data(option.payoff, "priceOptionSigma600.dat")
+  plot.option.sigma(data=option.payoff, mx=TRUE, file="priceOptionSigma600.eps")
+} else {
+  # volatility bracket 0 < sigma_annual < 0.75
+  option.payoff <- price.option.sigma(S0=S0, sigma.min=sigma.min, sigma.max=0.75,
+                                      sigma.step=sigma.step, K=K, r=r, T=T, l=l, reps=reps,
+                                      seed=seed, pseudo=pseudoRnd, cluster=cl)
+
+  # plot the results
+  csv.write.data(option.payoff, "priceOptionSigma75.dat")
+  plot.option.sigma(data=option.payoff, mx=TRUE, file="priceOptionSigma75.eps",
+                    lposx="right", lposy="top")
+}
+
+# In case of unexpected program exceptions, clean up the cluster
+.Last <- function()
+{
+  if (@HAVE_MPI@) {
+    stopCluster(cl)
+  }
+}
+
+message("Finished simulation.")

@@ -1,0 +1,11 @@
+Package: @PACKAGE_NAME@
+Version: @VERSION@
+Date: 2008-05-09
+Title: Asian Option Pricing and the Greeks
+Author: Dominik Dahlem <Dominik.Dahlem@gmail.com>
+Maintainer: Dominik Dahlem <Dominik.Dahlem@gmail.com>
+Depends: R (>= 2.6), fOptions, gplots @SNOW@
+Description: Price Asian Call options using Monte Carlo simulation.
+License: GPL-2
+URL: http://www.r-project.org
+     
